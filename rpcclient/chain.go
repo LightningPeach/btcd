@@ -617,6 +617,15 @@ func (r FutureVerifyChainResult) Receive() (bool, error) {
 	return verified, nil
 }
 
+func (c *Client) ProcessHeight(height, blocks int) (bool, error) {
+	return c.ProcessHeightAsync(height, blocks).Receive()
+}
+
+func (c *Client) ProcessHeightAsync(height, blocks int) FutureVerifyChainResult {
+	cmd := btcjson.NewProcessHeightCmd(height, blocks)
+	return c.sendCmd(cmd)
+}
+
 // VerifyChainAsync returns an instance of a type that can be used to get the
 // result of the RPC at some future time by invoking the Receive function on the
 // returned instance.

@@ -173,6 +173,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"verifychain":           handleVerifyChain,
 	"verifymessage":         handleVerifyMessage,
 	"version":               handleVersion,
+	"processheight":         handleProcessHeight,
 }
 
 // list of commands that we recognize, but for which btcd has no support because
@@ -278,6 +279,7 @@ var rpcLimited = map[string]struct{}{
 	"uptime":                {},
 	"validateaddress":       {},
 	"verifymessage":         {},
+	"processheight":         {},
 	"version":               {},
 }
 
@@ -350,6 +352,75 @@ func newGbtWorkState(timeSource blockchain.MedianTimeSource) *gbtWorkState {
 // supported but are not yet implemented.
 func handleUnimplemented(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	return nil, ErrRPCUnimplemented
+}
+
+// handleUnimplemented is the handler for commands that should ultimately be
+// supported but are not yet implemented.
+func handleProcessHeight(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+
+	c := cmd.(*btcjson.ProcessHeightCmd)
+	// When the passed height is too high or zero, just return 0 now
+	// since we can't reasonably calculate the number of network hashes
+	// per second from invalid values.  When it's negative, use the current
+	// best block height.
+	best := s.cfg.Chain.BestSnapshot()
+	endHeight := int32(-1)
+	if c.Height != nil {
+		endHeight = int32(*c.Height)
+	}
+	if endHeight > best.Height || endHeight == 0 {
+		return int64(0), nil
+	}
+	if endHeight < 0 {
+		endHeight = best.Height
+	}
+
+	// Calculate the number of blocks per retarget interval based on the
+	// chain parameters.
+	blocksPerRetarget := int32(s.cfg.ChainParams.TargetTimespan /
+		s.cfg.ChainParams.TargetTimePerBlock)
+
+	// Calculate the starting block height based on the passed number of
+	// blocks.  When the passed value is negative, use the last block the
+	// difficulty changed as the starting height.  Also make sure the
+	// starting height is not before the beginning of the chain.
+	numBlocks := int32(120)
+	if c.Blocks != nil {
+		numBlocks = int32(*c.Blocks)
+	}
+	var startHeight int32
+	if numBlocks <= 0 {
+		startHeight = endHeight - ((endHeight % blocksPerRetarget) + 1)
+	} else {
+		startHeight = endHeight - numBlocks
+	}
+	if startHeight < 0 {
+		startHeight = 0
+	}
+
+	rpcsLog.Infof("Start validating blocks from height: %d", startHeight)
+
+	for curHeight := startHeight; curHeight <= endHeight; curHeight++ {
+		hash, err := s.cfg.Chain.BlockHashByHeight(curHeight)
+		if err != nil {
+			context := "Failed to fetch block hash"
+			return nil, internalRPCError(err.Error(), context)
+		}
+
+		block, err := s.cfg.Chain.BlockByHash(hash)
+		if err != nil {
+			context := "Failed to fetch block"
+			return nil, internalRPCError(err.Error(), context)
+		}
+
+		// Ensure the blocks follows all of the chain rules and match up to the
+		// known checkpoints.
+		if err := s.cfg.Chain.ValidateBlock(block); err != nil {
+			return false, err
+		}
+	}
+
+	return nil, nil
 }
 
 // handleAskWallet is the handler for commands that are recognized as valid, but

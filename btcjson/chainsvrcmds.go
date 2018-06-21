@@ -773,6 +773,20 @@ func NewVerifyTxOutProofCmd(proof string) *VerifyTxOutProofCmd {
 	}
 }
 
+// VerifyTxOutProofCmd defines the verifytxoutproof JSON-RPC command.
+type ProcessHeightCmd struct {
+	Height *int `jsonrpcdefault:"-1"`
+	Blocks *int `jsonrpcdefault:"120"`
+}
+
+// NewProcessHeightCmd re-validate broken block.
+func NewProcessHeightCmd(height, blocks int) *ProcessHeightCmd {
+	return &ProcessHeightCmd{
+		Height: &height,
+		Blocks: &blocks,
+	}
+}
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
@@ -825,4 +839,5 @@ func init() {
 	MustRegisterCmd("verifychain", (*VerifyChainCmd)(nil), flags)
 	MustRegisterCmd("verifymessage", (*VerifyMessageCmd)(nil), flags)
 	MustRegisterCmd("verifytxoutproof", (*VerifyTxOutProofCmd)(nil), flags)
+	MustRegisterCmd("processheight", (*ProcessHeightCmd)(nil), flags)
 }

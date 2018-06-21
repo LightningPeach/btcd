@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"sort"
 	"sync"
+	"strings"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -38,6 +39,29 @@ const (
 	// NOTE: This must be defined last in order to avoid influencing iota.
 	statusNone blockStatus = 0
 )
+
+// String formats string contains readable part
+func (status blockStatus) String() string {
+	var result []string
+
+	if status&statusDataStored != 0 {
+		result = append(result, "statusDataStored")
+	}
+	if status&statusValid != 0 {
+		result = append(result, "statusValid")
+	}
+	if status&statusValidateFailed != 0 {
+		result = append(result, "statusValidateFailed")
+	}
+	if status&statusInvalidAncestor != 0 {
+		result = append(result, "statusInvalidAncestor")
+	}
+	if status&statusNone != 0 {
+		result = append(result, "statusNone")
+	}
+
+	return strings.Join(result, "|")
+}
 
 // HaveData returns whether the full block data is stored in the database. This
 // will return false for a block node where only the header is downloaded or

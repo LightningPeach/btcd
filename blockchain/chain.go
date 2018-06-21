@@ -1015,6 +1015,26 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 	return nil
 }
 
+func (b *BlockChain) ValidateBlock(block *btcutil.Block) error {
+	node := b.index.LookupNode(block.Hash())
+	if node == nil {
+		str := fmt.Sprintf("block %s is unknown", node.hash)
+		return ruleError(ErrPreviousBlockUnknown, str)
+	}
+
+	status := b.index.NodeStatus(node)
+	if status.KnownInvalid() {
+		str := fmt.Sprintf("block %s is known to be invalid, status: %v",
+			node.hash, status.String())
+		return ruleError(ErrInvalidAncestorBlock, str)
+	}
+
+	//log.Debugf("block height %v set as valid", node.height)
+	//b.index.SetStatusFlags(node, statusValid)
+
+	return nil
+}
+
 // connectBestChain handles connecting the passed block to the chain while
 // respecting proper chain selection according to the chain with the most
 // proof of work.  In the typical case, the new block simply extends the main
@@ -1336,9 +1356,9 @@ func (b *BlockChain) HeightToHashRange(startHeight int32,
 	if endNode == nil {
 		return nil, fmt.Errorf("no known block header with hash %v", endHash)
 	}
-	if !b.index.NodeStatus(endNode).KnownValid() {
-		return nil, fmt.Errorf("block %v is not yet validated", endHash)
-	}
+	//if !b.index.NodeStatus(endNode).KnownValid() {
+	//	return nil, fmt.Errorf("block %v is not yet validated", endHash)
+	//}
 	endHeight := endNode.height
 
 	if startHeight < 0 {
